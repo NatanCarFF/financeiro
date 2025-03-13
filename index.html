@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel Financeiro</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background: #f4f4f4; }
+        .container { width: 50%; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        .header-buttons { display: flex; justify-content: space-around; margin-bottom: 20px; }
+        .banner { background: linear-gradient(to right, #007bff, #00c3ff); color: white; padding: 15px; font-size: 24px; font-weight: bold; border-radius: 10px; text-transform: uppercase; margin-bottom: 20px; }
+        .summary { display: flex; justify-content: space-around; margin: 20px 0; }
+        .summary div { padding: 10px; border-radius: 5px; font-weight: bold; }
+        .income { background: lightgreen; }
+        .expense { background: lightcoral; }
+        .balance { background: lightblue; }
+        table { width: 100%; margin-top: 20px; border-collapse: collapse; background: white; }
+        th, td { padding: 10px; border: 1px solid black; text-align: left; }
+        th { background: #ddd; }
+        button { cursor: pointer; padding: 5px 10px; border: none; border-radius: 5px; }
+        .delete-btn { background: red; color: white; }
+        .delete-btn:hover { background: darkred; }
+        .clear-btn { background: #dc3545; color: white; }
+        .clear-btn:hover { background: #c82333; }
+        .save-btn { background: #007bff; color: white; }
+        .save-btn:hover { background: #0056b3; }
+        .export-btn { background: #ffc107; color: black; }
+        .export-btn:hover { background: #e0a800; }
+        .import-btn { background: #17a2b8; color: white; }
+        .import-btn:hover { background: #138496; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-buttons">
+            <button class="save-btn" onclick="saveTransactions()">💾 Salvar</button>
+            <button class="clear-btn" onclick="clearTransactions()">🗑 Limpar Tudo</button>
+            <button class="export-btn" onclick="exportTransactions()">📤 Exportar</button>
+            <button class="import-btn" onclick="document.getElementById('importFile').click()">📥 Importar</button>
+            <input type="file" id="importFile" style="display: none;" accept="application/json" onchange="importTransactions(event)">
+        </div>
+        <div class="banner">Painel Financeiro</div>
+        <div class="summary">
+            <div class="balance">Saldo: R$ <span id="balance">0.00</span></div>
+            <div class="income">Receitas: R$ <span id="income">0.00</span></div>
+            <div class="expense">Despesas: R$ <span id="expense">0.00</span></div>
+        </div>
+        <form id="transactionForm">
+            <input type="text" id="description" placeholder="Descrição" required>
+            <input type="number" id="amount" placeholder="Valor" required>
+            <select id="type">
+                <option value="income">Receita</option>
+                <option value="expense">Despesa</option>
+            </select>
+            <button type="submit">Adicionar</button>
+        </form>
+        <table>
+            <thead>
+                <tr>
+                    <th>Descrição</th>
+                    <th>Valor</th>
+                    <th>Tipo</th>
+                    <th>Ação</th>
+                </tr>
+            </thead>
+            <tbody id="transactionList"></tbody>
+        </table>
+    </div>
+    <script>
+        let transactions = JSON.parse(localStorage.getItem('transactions')) || [];
+
+        document.getElementById('transactionForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const description = document.getElementById('description').value;
+            const amount = parseFloat(document.getElementById('amount').value);
+            const type = document.getElementById('type').value;
+            
+            transactions.push({ description, amount, type });
+            updateUI();
+            this.reset();
+        });
+
+        function updateUI() {
+            let income = 0, expense = 0, balance = 0;
+            const tbody = document.getElementById('transactionList');
+            tbody.innerHTML = '';
+
+            transactions.forEach((t, index) => {
+                balance += t.type === 'income' ? t.amount : -t.amount;
+                if (t.type === 'income') income += t.amount;
+                else expense += t.amount;
+                
+                const row = `<tr>
+                    <td>${t.description}</td>
+                    <td>R$ ${t.amount.toFixed(2)}</td>
+                    <td>${t.type === 'income' ? 'Receita' : 'Despesa'}</td>
+                    <td><button class='delete-btn' onclick="removeTransaction(${index})">Remover</button></td>
+                </tr>`;
+                tbody.innerHTML += row;
+            });
+            
+            document.getElementById('balance').textContent = balance.toFixed(2);
+            document.getElementById('income').textContent = income.toFixed(2);
+            document.getElementById('expense').textContent = expense.toFixed(2);
+        }
+
+        function removeTransaction(index) {
+            transactions.splice(index, 1);
+            updateUI();
+        }
+
+        function saveTransactions() {
+            localStorage.setItem('transactions', JSON.stringify(transactions));
+            alert('Transações salvas com sucesso!');
+        }
+
+        function clearTransactions() {
+            if (confirm('Tem certeza que deseja apagar todas as transações?')) {
+                transactions = [];
+                localStorage.removeItem('transactions');
+                updateUI();
+            }
+        }
+
+        function exportTransactions() {
+            const now = new Date();
+            const timestamp = `${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2,'0')}-${now.getDate().toString().padStart(2,'0')}_${now.getHours().toString().padStart(2,'0')}-${now.getMinutes().toString().padStart(2,'0')}`;
+            const filename = `transacoes_${timestamp}.json`;
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(transactions));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", filename);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            document.body.removeChild(downloadAnchor);
+        }
+
+        function importTransactions(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                transactions = JSON.parse(e.target.result);
+                updateUI();
+            };
+            reader.readAsText(file);
+        }
+
+        updateUI();
+    </script>
+</body>
+</html>
